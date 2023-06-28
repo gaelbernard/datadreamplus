@@ -13,6 +13,7 @@ from googletrans import Translator
 from langdetect import detect
 import time
 import numpy as np
+import os
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = 'credentials.json'
 
