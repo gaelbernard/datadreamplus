@@ -6,3 +6,4 @@ pandas==2.0.2
 protobuf==4.23.3
 sentence_transformers==2.2.2
 setuptools==68.0.0
+google-cloud-storage==2.10.0

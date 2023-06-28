@@ -368,9 +368,6 @@ class DataPrep:
         :return: None
         '''
 
-        from googletrans import Translator
-        from langdetect import detect
-
         '''
         translate the text in batches
         In case of interruption, it will resume from where it stopped.
@@ -417,6 +414,9 @@ class DataPrep:
         '''
         assert isinstance(text, str)
         assert len(text)>0
+
+        from googletrans import Translator
+        from langdetect import detect
 
         if self.translator is None:
             self.translator = Translator()
