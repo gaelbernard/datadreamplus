@@ -1,5 +1,4 @@
 import pandas as pd
-from sentence_transformers import SentenceTransformer
 from google.cloud import storage
 import json
 import hashlib
@@ -9,8 +8,6 @@ from config import *
 import sys
 import shutil
 import pickle
-from googletrans import Translator
-from langdetect import detect
 import time
 import numpy as np
 import os
@@ -304,6 +301,8 @@ class DataPrep:
         :return: a dataframe with the embeddings
             we keep the same index as the original dataframe
         '''
+        from sentence_transformers import SentenceTransformer
+
         model = SentenceTransformer(self.MODEL)
         size = self.df.shape[0]
 
@@ -368,6 +367,9 @@ class DataPrep:
         Translate the text to english
         :return: None
         '''
+
+        from googletrans import Translator
+        from langdetect import detect
 
         '''
         translate the text in batches
