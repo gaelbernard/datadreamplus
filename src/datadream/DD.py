@@ -363,7 +363,7 @@ class DataPrep:
         map = self._batch_merge_and_delete(folder)
         return map
 
-    def translate(self, batch_size=100):
+    def translate(self, column='text', batch_size=100):
         '''
         Translate the text to english
         :return: None
@@ -393,16 +393,16 @@ class DataPrep:
         for i in range(start_index, size, batch_size):
             ldf = self.df.iloc[i:i + batch_size, :]
             translations = []
-            for text in ldf['text'].tolist():
+            for text in ldf[column].tolist():
                 translations.append(self._translate_text(text))
             pd.DataFrame(translations, index=ldf.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
 
         # Merge into one dataframe
         translations = self._batch_merge_and_delete(folder)
 
-        self.df['original_text'] = self.df['text']
-        self.df['text'] = translations['translation']
-        self.df = self.df.join(translations[['trad_detected_language', 'trad_status']])
+        self.df[f'original_{column}'] = self.df['text']
+        self.df[column] = translations['translation']
+        self.df = self.df.join(translations[[f'trad_detected_language_{column}', f'trad_status_{column}']])
         return translations
 
     def _translate_text(self, text, max_retries=5):
@@ -469,10 +469,11 @@ class DataPrep:
 
 
 if __name__ == '__main__':
-    t = ['abc']*99
+    t = ['abc']*3
     example = pd.DataFrame({'text': t, 'text2': 0.34*len(t), 'other': range(len(t)), 'other2': range(len(t))})
     example.set_index('other', inplace=True)
-
+    print (example)
+    exit()
     prep = DataPrep(example)
 
     embedding = pd.DataFrame(np.random.rand(len(t), 768), index=example.index)
