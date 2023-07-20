@@ -12,7 +12,7 @@ class TestDataPrep(unittest.TestCase):
         self.existing_map = pd.DataFrame(np.random.rand(len(self.texts), 2), index=self.df.index)
         self.existing_embeddings = pd.DataFrame(np.random.rand(len(self.texts), 768), index=self.df.index)
         #prep = DataPrep(self.df)
-        #df, self.embeddings, self.map = prep.run(translate=True)
+        #df, self.embeddings, self.map = prep.run(_translate=True)
 
     def test_run_without_translate(self):
         prep = DataPrep(self.df)

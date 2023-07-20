@@ -5,6 +5,7 @@
 ### Encryptions & Keys
 At the root of your project, you should have the following two files:
 
+
 - `config.py` containing the encryption keys:
 ```python
 ENCRYPTION_KEY = 'eeb...{SECRET_KEY}...'
@@ -25,11 +26,22 @@ LIBRE_TRANSLATE_API_KEY = '118..{SECRET_KEY}...'
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/661978949901-compute%40developer.gserviceaccount.com",
   "universe_domain": "googleapis.com"
 }
+
+
+It is very important to install
+pip install googletrans==4.0.0-rc1
+Otherwise, the translation won't work
+
+
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+
 ```
 
 ### Install the package
 ```bash 
-pip install https://github.com/gaelbernard/datadreamplus/raw/main/dist/datadream-0.0.1-py3-none-any.whl --force-reinstall
+pip install https://github.com/gaelbernard/datadreamplus/raw/main/dist/datadream-0.0.1-py3-none-any.whl --force-reinstall --no-cache-dir
 ```
 
 

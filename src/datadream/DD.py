@@ -9,8 +9,10 @@ import sys
 import shutil
 import pickle
 import time
+import nltk
 import numpy as np
 import os
+
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = 'credentials.json'
 
@@ -90,7 +92,7 @@ class DataDream:
     def load_map(self):
         return self._load('map')
 
-    def upload(self, data, embeddings, map, description, source, allow_overwrite=False, encrypt=True):
+    def upload(self, data, embeddings, map, description, source, allow_overwrite=False, encrypt=True, exclude_from_preview=[]):
         '''
         Upload a dataframe and the embedding to the cloud
         :param df: Dataframe containing the text that was embedded ('column')
@@ -112,7 +114,7 @@ class DataDream:
             'data': data,
         }
         md5 = {}
-        for type, df in queue.items():
+        for type, df_to_submit in queue.items():
 
             print (f'uploading {type} ...')
             file = f'temp_{type}.pkl'
@@ -121,9 +123,9 @@ class DataDream:
             # Encryption: Extra layer of protection, we encrypt the data before uploading it
             # (can be skipped for non-confidential data)
             if encrypt and type=='data':
-                crp.to_encrypted(data, password=ENCRYPTION_KEY, path=file)
+                crp.to_encrypted(df_to_submit, password=ENCRYPTION_KEY, path=file)
             else:
-                data.to_pickle(file)
+                df_to_submit.to_pickle(file)
 
             md5[type] = hashlib.md5(pathlib.Path(file).read_bytes()).hexdigest()
 
@@ -136,7 +138,7 @@ class DataDream:
 
         # We put the metadata in the data blob only
         # ...avoid to have two versions of the metadata
-        sample_data = data.sample(max(10,data.shape[0]))
+        sample_data = data.sample(min(5, data.shape[0])).copy()
 
         # Upload the metadata
         metadata = {
@@ -148,7 +150,7 @@ class DataDream:
             'size_map_mo': sys.getsizeof(map)*1e-6,
             'description': description,
             'source': source,
-            'sample_data': sample_data.to_json(orient='index'),
+            'sample_data': sample_data.drop(exclude_from_preview, axis=1).to_json(orient='index'),
             'sample_embedding': embeddings.loc[sample_data.index,:].to_json(orient='index'),
             'sample_map': map.loc[sample_data.index,:].to_json(orient='index'),
             'md5_data': md5['data'],
@@ -253,10 +255,10 @@ class DataPrep:
         if not os.path.exists(self.path):
             os.mkdir(self.path)
 
-    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_reducer_150_0_1000_squared.pkl'):
+    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_reducer_150_0_1000_squared.pkl', delete=False):
         '''
         Run the data preparation
-        :param translate:u if True, we translate the text to english.
+        :param translate:u if True, we _translate the text to english.
             We keep the original text in the df, but we put the translated version in the column text
         :param embeddings: Use embedding to represent the text.
             In case the text was already embedded, you can provide it as a dataframe so we avoid computational cost and we just check that the index matches
@@ -264,17 +266,19 @@ class DataPrep:
         :param map: map the embeddings in a 2D space.
             If not provided we do it using UMAP
         :return: Two dataframes:
-            - the original dataframe with the column 'text' translated to english if translate=True
+            - the original dataframe with the column 'text' translated to english if _translate=True
             - the embeddings
             - the map
         '''
         if translate:
-            self.translate()
+            print ('translating text to english...')
+            self._translate(delete)
 
         # If embeddings is not provided we compute it using the SentenceTransformer
         # otherwise we just check that the index matches
         if embeddings is None:
-            embeddings = self._embed()
+            print('computing embeddings...')
+            embeddings = self._embed(delete)
         else:
             assert isinstance(embeddings, pd.DataFrame)
             assert self.df.index.equals(embeddings.index)
@@ -284,7 +288,8 @@ class DataPrep:
         # If map is not provided we compute it using UMAP
         # otherwise we just check that the index matches
         if map is None:
-            map = pd.DataFrame(self._umap(embeddings, umap_cloud_path), index=embeddings.index)
+            print('computing map...')
+            map = pd.DataFrame(self._umap(embeddings, umap_cloud_path, delete), index=embeddings.index)
         else:
             assert isinstance(map, pd.DataFrame)
             assert self.df.index.equals(map.index)
@@ -292,7 +297,7 @@ class DataPrep:
 
         return self.df, embeddings, map
 
-    def _embed(self, batch_size=100):
+    def _embed(self, delete, batch_size=100):
         '''
         Embed the text using the SentenceTransformer.
         It will perform it in batches.
@@ -324,24 +329,27 @@ class DataPrep:
             pd.DataFrame(model.encode(ldf['text'].values), index=ldf.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
 
         # Merge into one dataframe
-        embeddings = self._batch_merge_and_delete(folder)
+        embeddings = self._batch_merge_and_delete(folder, delete)
 
         return embeddings
 
-    def _umap(self, embeddings, umap_cloud_path, batch_size=10):
+    def _umap(self, embeddings, umap_cloud_path, delete, batch_size=100):
         local_path_umap = f'{self.path}/{umap_cloud_path}'
         # If umap is not found locally we download it from the cloud
         if not os.path.exists(local_path_umap):
+            print ('downloading umap from cloud...')
             bucket = DataDream.cloud.bucket(DataDream.BUCKET_NAME)
             bucket.blob(umap_cloud_path).download_to_filename(local_path_umap)
 
         with open(local_path_umap, 'rb') as f:
+            print('loading umap...')
             reducer = pickle.load(f)
 
         # Do the map by batches
         size = self.df.shape[0]
 
         # We save the file in a folder named md5
+        print('get hash...')
         hash = hashlib.md5(str(self.df.to_dict()).encode('utf-8')).hexdigest()
         folder = f'{self.path}/{hash}_map'
 
@@ -349,9 +357,11 @@ class DataPrep:
         if not os.path.exists(folder):
             os.makedirs(folder)
 
+        print ('_batch_get_last_row_done...')
         # We check if we already have some map coordinates (instead of starting from scratch)
         start_index = self._batch_get_last_row_done(folder)
 
+        print ('start loop')
         # Do the loop by batch of 100
         for i in range(start_index, size, batch_size):
             lembeddings = embeddings.iloc[i:i + batch_size, :]
@@ -359,17 +369,17 @@ class DataPrep:
             pd.DataFrame(map, index=lembeddings.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
 
         # Merge into one dataframe
-        map = self._batch_merge_and_delete(folder)
+        map = self._batch_merge_and_delete(folder, delete)
         return map
 
-    def translate(self, column='text', batch_size=100):
+    def _translate(self, delete, column='text', batch_size=100):
         '''
         Translate the text to english
         :return: None
         '''
 
         '''
-        translate the text in batches
+        _translate the text in batches
         In case of interruption, it will resume from where it stopped.
 
         :return: a dataframe with the translations
@@ -397,18 +407,18 @@ class DataPrep:
             pd.DataFrame(translations, index=ldf.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
 
         # Merge into one dataframe
-        translations = self._batch_merge_and_delete(folder)
+        translations = self._batch_merge_and_delete(folder, delete)
 
         self.df[f'original_{column}'] = self.df['text']
         self.df[column] = translations['translation']
-        self.df = self.df.join(translations[[f'trad_detected_language_{column}', f'trad_status_{column}']])
+        self.df = self.df.join(translations[[f'trad_detected_language', f'trad_status']])
         return translations
 
     def _translate_text(self, text, max_retries=5):
         '''
         Translate text from any language to english
         (Using libretranslate)
-        :param text: text to translate
+        :param text: text to _translate
         :param max_retries: number of retries if translation fails
         :return: translated text
         '''
@@ -457,7 +467,7 @@ class DataPrep:
 
         return start_index
 
-    def _batch_merge_and_delete(self, folder):
+    def _batch_merge_and_delete(self, folder, delete):
         dfs = []
         for file in os.listdir(folder):
             if file.endswith(".pkl"):
@@ -465,85 +475,27 @@ class DataPrep:
         dfs = pd.concat(dfs).loc[self.df.index, :]
         assert len(dfs) == self.df.shape[0]
         assert dfs.index.equals(self.df.index)
-        shutil.rmtree(folder)
+        if delete:
+            shutil.rmtree(folder)
 
         return dfs
 
+    @staticmethod
+    def explode_sentences(df, column='text'):
+        u = df[column].apply(DataPrep._split_sentence)
+        df = pd.DataFrame(df.values.repeat(u.str.len(), axis=0), columns=df.columns).copy()
+        df[column] = u.explode().values
+        return df
 
-if __name__ == '__main__':
-    t = ['abc']*3
-    example = pd.DataFrame({'text': t, 'text2': 0.34*len(t), 'other': range(len(t)), 'other2': range(len(t))})
-    example.set_index('other', inplace=True)
-    print (example)
-    exit()
-    prep = DataPrep(example)
-
-    embedding = pd.DataFrame(np.random.rand(len(t), 768), index=example.index)
-
-    # time the mapping
-    start = time.time()
-    df, embeddings, map = prep.run(embeddings=pd.DataFrame(embedding, index=example.index), translate=False)
-
-
-    print (time.time() - start)
-    exit()
-    print (map)
-    exit()
-    cdd = DataDream('helloworld')
-    #cdd.delete_blob()
-    cdd.upload(example, embeddings, map, 'test set', 'synthetic data for testing')
-    exit()
+    @staticmethod
+    def _split_sentence(text):
+        return [
+            x for x in nltk.sent_tokenize(text.replace('\n', ''))
+            if
+            len(x) > 30
+            and x.count(' ') > 5
+        ]
 
 
-    #metadata_df, dct_data, dct_embeddings = CloudDualData.list_dataset(verbose=True)
-
-    #exit()
-    #
-    # # load a dataset from the cloud
-    #cdd = CloudDualData('wikipedia')
-    #data = cdd.load_data()
-    # embeddings = cdd.load_embeddings()
-    # print (data)
-    # exit()
-    #embeddings = pd.read_pickle('embeddings.pkl')
-    #data = pd.read_pickle('data.pkl')
-    #print (data)
-    #exit()
-    cdd = DataDream('helloworld')
-    embeddings = cdd.load_embeddings()
-    data = cdd.load_data()
-    print (embeddings)
-    cdd.delete_blob()
-    exit()
-    print (data)
-
-    cdd2 = DataDream('helloworld')
-    prep = DataPrep(data)
-    df, embeddings, map = prep.run(embeddings=embeddings, translate=False)
-    print (map)
-
-    cdd2.upload(data, embeddings, map, 'helloworld', 'helloworld', encrypt=False, allow_overwrite=True)
-    exit()
-    #cdd.upload(data, embeddings, 'Top 5% (in pageviews) of all wikipedia pages in English', 'Database from txtai downloaded here: https://huggingface.co/NeuML/txtai-wikipedia.', encrypt=False)
-
-    # take df with text, use embedding, and upload it to the cloud
-    t = ['This one is in English', 'Celui ci est en franglais', 'Dieser ist auf Deutsch', 'Este es en espanol', 'Questo e in italiano', 'これは日本語です', '这是中文', '이것은 한국어입니다', 'هذا باللغة العربية', 'Это на русском', 'यह हिंदी में है', 'এটি বাংলায়', 'ఇది తెలుగులో', 'ഇത് മലയാളത്തിൽ', 'این فارسی است', 'ეს ქართულია', 'Toto']
-    example = pd.DataFrame({'text': t, 'other': range(len(t))})
-    example.set_index('other', inplace=True)
-    prep = DataPrep(example)
-    df, embeddings, map = prep.run(translate=True)
-
-
-    print ('second run')
-    df, embeddings, map = prep.run(embeddings=embeddings, translate=False)
-
-    print (embeddings)
-    cdd = DataDream('helloworld')
-    cdd.upload(df, embeddings, map, 'Wikipedia (EN): using lead paragraph', 'Model from HuggingFace', allow_overwrite=True, encrypt=False)
-    exit()
-    metadata_df, dct_data, dct_embeddings = DataDream.list_dataset(verbose=True)
-    #print (data)
-    # delete a dataset from the cloud
-    #cdd.delete_blob()
 
 
