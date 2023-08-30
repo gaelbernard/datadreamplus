@@ -31,12 +31,6 @@ LIBRE_TRANSLATE_API_KEY = '118..{SECRET_KEY}...'
 It is very important to install
 pip install googletrans==4.0.0-rc1
 Otherwise, the translation won't work
-
-
-import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
-
 ```
 
 ### Install the package
@@ -59,7 +53,7 @@ CloudDualData.list_dataset(verbose=True)
 ```
 
 ### Load a dataset
-All datasets are composed of three dataframe that can be loaded independently. Each dataset will be saved locally in the `data` folder. When you run the command again, it compares the MD5 and only download the files that have changed.
+All datasets are composed of three dataframes that can be loaded independently. Each dataset will be saved locally in the `data` folder. When you run the command again, it compares the MD5 and only download the files that have changed.
 ```python
 # Load the dataset helloworld
 d = DataDream('helloworld')
@@ -105,7 +99,7 @@ prep = DataPrep(df, embeddings=embeddings, map=map)
 df, embeddings, map = prep.run()
 ```
 
-You can translate also translate the text. In this case, the translated text will be stored in the column 'text' and the original text in an additional column
+You can also translate the text. In this case, the translated text will be stored in the column 'text' and the original text in an additional column
 ```python
 prep = DataPrep(df, translate=True)
 df, embeddings, map = prep.run()
@@ -114,6 +108,7 @@ df, embeddings, map = prep.run()
 #### Upload
 Uploading to the cloud is as simple as:
 ```python
+cdd = DataDream('helloworld')
 cdd.upload(df, embeddings, map, 'top 5% of all wikipedia pages (in terms of viewcount)', 'dataset downloaded from txtai')
 ```
 
