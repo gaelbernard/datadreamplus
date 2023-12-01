@@ -113,3 +113,8 @@ cdd.upload(df, embeddings, map, 'top 5% of all wikipedia pages (in terms of view
 ```
 
 The upload will not work if a dataset already exists with the same name. You can force the upload by setting `allow_overwrite=True` in the upload function.
+
+### Build the wheel
+```bash
+ pip wheel .
+```
