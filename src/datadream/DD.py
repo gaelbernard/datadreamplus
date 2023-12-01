@@ -255,7 +255,7 @@ class DataPrep:
         if not os.path.exists(self.path):
             os.mkdir(self.path)
 
-    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_reducer_150_0_1000_squared.pkl', delete=False):
+    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_reducer_150_0_1000_squared.pkl', delete=False, device=None):
         '''
         Run the data preparation
         :param translate:u if True, we _translate the text to english.
@@ -278,7 +278,7 @@ class DataPrep:
         # otherwise we just check that the index matches
         if embeddings is None:
             print('computing embeddings...')
-            embeddings = self._embed(delete)
+            embeddings = self._embed(delete, device=device)
         else:
             assert isinstance(embeddings, pd.DataFrame)
             assert self.df.index.equals(embeddings.index)
