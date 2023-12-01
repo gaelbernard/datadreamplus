@@ -116,5 +116,7 @@ The upload will not work if a dataset already exists with the same name. You can
 
 ### Build the wheel
 ```bash
- pip wheel .
+ cd dist
+ pip wheel ../. 
+
 ```
