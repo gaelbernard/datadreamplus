@@ -1,3 +1,10 @@
-config.py
-credentials.json
-src/
+/data/wiki/
+/data/top1_embeddings.pickle
+/data/randoms_embeddings.pickle
+temp.*
+/archive/
+**/credentials.json
+**/config.py
+**/data/
+**/randomEmbeddings/
+db.sqlite
