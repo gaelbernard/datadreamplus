@@ -326,7 +326,7 @@ class DataPrep:
         # Do the loop by batch of 100
         for i in range(start_index, size, batch_size):
             ldf = self.df.iloc[i:i + batch_size, :]
-            pd.DataFrame(model.encode(ldf['text'].values, device=None), index=ldf.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
+            pd.DataFrame(model.encode(ldf['text'].values, device=device), index=ldf.index.tolist()).to_pickle(f'{folder}/{i}.pkl')
 
         # Merge into one dataframe
         embeddings = self._batch_merge_and_delete(folder, delete)
