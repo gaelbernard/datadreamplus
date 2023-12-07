@@ -255,7 +255,7 @@ class DataPrep:
         if not os.path.exists(self.path):
             os.mkdir(self.path)
 
-    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_reducer_150_0_1000_squared.pkl', delete=False, device=None):
+    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_n12_openalex_V2.pkl', delete=False, device=None):
         '''
         Run the data preparation
         :param translate:u if True, we _translate the text to english.
