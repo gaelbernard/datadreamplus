@@ -139,7 +139,11 @@ class DataDream:
         # We put the metadata in the data blob only
         # ...avoid to have two versions of the metadata
         sample_data = data.sample(min(5, data.shape[0])).copy()
-
+        try:
+            preview = sample_data.drop(exclude_from_preview, axis=1).to_json(orient='index', default_handler=str)
+        except:
+            print ('error creating the preview')
+            preview = ''
         # Upload the metadata
         metadata = {
             'nrecords': data.shape[0],
@@ -150,7 +154,7 @@ class DataDream:
             'size_map_mo': sys.getsizeof(map)*1e-6,
             'description': description,
             'source': source,
-            'sample_data': sample_data.drop(exclude_from_preview, axis=1).to_json(orient='index', default_handler=str),
+            'sample_data': preview,
             'sample_embedding': embeddings.loc[sample_data.index,:].to_json(orient='index'),
             'sample_map': map.loc[sample_data.index,:].to_json(orient='index'),
             'md5_data': md5['data'],
