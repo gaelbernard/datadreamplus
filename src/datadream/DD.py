@@ -259,7 +259,7 @@ class DataPrep:
         if not os.path.exists(self.path):
             os.mkdir(self.path)
 
-    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap_model.pkl', pca_cloud_path='pca_model.pkl', delete=False, device=None):
+    def run(self, embeddings=None, map=None, translate=False, umap_cloud_path='umap-mpnet-title-only.pkl', delete=False, device=None):
         '''
         Run the data preparation
         :param translate:u if True, we _translate the text to english.
@@ -293,7 +293,7 @@ class DataPrep:
         # otherwise we just check that the index matches
         if map is None:
             print('computing map...')
-            map = pd.DataFrame(self._umap(embeddings, umap_cloud_path, pca_cloud_path, delete), index=embeddings.index)
+            map = pd.DataFrame(self._umap(embeddings, umap_cloud_path, delete), index=embeddings.index)
         else:
             assert isinstance(map, pd.DataFrame)
             assert self.df.index.equals(map.index)
@@ -337,10 +337,9 @@ class DataPrep:
 
         return embeddings
 
-    def _umap(self, embeddings, umap_cloud_path, pca_cloud_path, delete, batch_size=100):
+    def _umap(self, embeddings, umap_cloud_path, delete, batch_size=100):
 
         local_path_umap = f'{self.path}/{umap_cloud_path}'
-        local_path_pca = f'{self.path}/{pca_cloud_path}'
 
         # If umap is not found locally we download it from the cloud
         if not os.path.exists(local_path_umap):
@@ -350,16 +349,6 @@ class DataPrep:
         with open(local_path_umap, 'rb') as f:
             print('loading umap...')
             reducer = pickle.load(f)
-
-        # If pca is not found locally we download it from the cloud
-        if local_path_pca is not None:
-            if not os.path.exists(local_path_pca):
-                print ('downloading pca from cloud...')
-                bucket = DataDream.cloud.bucket(DataDream.BUCKET_NAME)
-                bucket.blob(pca_cloud_path).download_to_filename(local_path_pca)
-            with open(local_path_pca, 'rb') as f:
-                print('loading pca...')
-                pca = pickle.load(f)
 
         # Do the map by batches
         size = self.df.shape[0]
